@@ -18,9 +18,44 @@
       <UColorModeSwitch />
     </div>
     <!-- Form -->
-    <UButton @click="downloadPdf" class="primary-btn linear-g">
-      تنزيل النسخة الأصلية مع إجاباتك
-    </UButton>
+    <UCard class="mb-4 shadow">
+      <template #default>
+        <div class="space-y-4">
+          <div>
+            <label class="block mb-2 font-medium">الاسم</label>
+            <UInput
+              v-model="childName"
+              class="w-full"
+              placeholder="اكتب اسمك هنا"
+            />
+          </div>
+
+          <div>
+            <label class="block w-full mb-2 font-medium">سنة الميلاد</label>
+            <UInput
+              v-model="birthYear"
+              class="w-full"
+              type="number"
+              placeholder="مثال: 2010"
+            />
+          </div>
+
+          <div>
+            <label class="block mb-2 font-medium">الجنس</label>
+            <URadioGroup
+              v-model="sex"
+              class="w-full"
+              variant="table"
+              :items="[
+                { label: 'ذكر', value: 'ذكر' },
+                { label: 'أنثى', value: 'أنثى' }
+              ]"
+            />
+          </div>
+        </div>
+      </template>
+    </UCard>
+
     <form class="sdq-form" @submit.prevent="onSubmit">
       <UCard v-for="q in questions" :key="q.id" class="mb-4 shadow">
         <template #default>
@@ -43,7 +78,12 @@
       </UCard>
 
       <div class="actions">
-        <button type="submit" class="primary-btn linear-g">
+        <button
+          type="submit"
+          class="primary-btn"
+          :class="showResults ? 'linear-r' : 'linear-g'"
+          @click.prevent="showResults ? resetForm() : onSubmit()"
+        >
           {{ showResults ? 'إعادة الحساب' : 'عرض نتائجي' }}
         </button>
         <p v-if="validationError" class="error">
@@ -51,14 +91,6 @@
         </p>
       </div>
     </form>
-
-    <!-- <UButton
-      @click="downloadPdf"
-      v-if="showResults"
-      class="primary-btn linear-g"
-    >
-      تنزيل النسخة الأصلية مع إجاباتك
-    </UButton> -->
 
     <!-- Results -->
     <section v-if="showResults" class="results">
@@ -121,7 +153,9 @@
           </p>
         </div>
       </div>
-
+      <button @click="downloadPdf" class="primary-btn linear-g">
+        تنزيل النسخة الأصلية مع إجاباتك
+      </button>
       <p class="mt-8 text-neutral-500 text-xs text-justify">
         هذه الدرجات لغرض الفحص الأولي فقط ولا تُعطي تشخيصاً. إذا شعرت بالقلق من
         هذه النتائج، من الأفضل أن تتحدث مع شخص بالغ موثوق أو مع مختص نفسي.
@@ -134,19 +168,15 @@
 import { reactive, computed, ref } from 'vue'
 import { generateSdqPdf } from '~/utils/generateSdqPdf'
 
-// async function downloadPdf() {
-//   const pdfBytes = await generateSdqPdf(responses)
+const childName = ref('')
+const birthYear = ref('')
+const sex = ref('')
 
-//   // @ts-ignore
-//   const blob = new Blob([pdfBytes], { type: 'application/pdf' })
-//   const url = URL.createObjectURL(blob)
+const router = useRouter()
 
-//   const a = document.createElement('a')
-//   a.href = url
-//   a.download = 'SDQ_Filled.pdf'
-//   a.click()
-//   URL.revokeObjectURL(url)
-// }
+const resetForm = () => {
+  router.go(0)
+}
 
 async function downloadPdf() {
   // Turn reactive responses into a plain object
@@ -183,21 +213,50 @@ async function downloadPdf() {
     `السلوك الاجتماعي الإيجابي: ${scores.prosocial} / 10 – ${bands.prosocial}`
   ]
 
+  const arabicInfo = [
+    `الاسم: ${childName.value}`,
+    `المواليد: ${birthYear.value}`,
+    `الجنس: ${sex.value}`
+  ]
+
   function createArabicSummaryImage(lines: string[]): string {
     const canvas = document.createElement('canvas')
     canvas.width = 800
     canvas.height = lines.length * 30 + 40
 
     const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = '#000'
-    ctx.font = '18px "Noto Sans Arabic", Arial'
+    ctx.fillStyle = '#006570'
+    ctx.font = '16px "Noto Kufi Arabic", Arial'
     ctx.textAlign = 'right'
     ctx.direction = 'rtl'
 
     let y = 30
     for (const line of lines) {
       ctx.fillText(line, canvas.width - 20, y)
-      y += 24
+      y += 30
+    }
+
+    // returns a dataURL we can feed to pdf-lib
+    return canvas.toDataURL('image/png')
+  }
+
+  function createArabicInfoImage(lines: string[]): string {
+    const canvas = document.createElement('canvas')
+    canvas.width = 800
+    canvas.height = lines.length * 30 + 40
+
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#006570'
+    ctx.font = '16px "Noto Kufi Arabic", Arial'
+    ctx.textAlign = 'right'
+    ctx.direction = 'rtl'
+    ctx.fontKerning = 'normal'
+    ctx.fontStretch = 'expanded'
+
+    let y = 30
+    for (const line of lines) {
+      ctx.fillText(line, canvas.width - 20, y)
+      y += 30
     }
 
     // returns a dataURL we can feed to pdf-lib
@@ -205,12 +264,14 @@ async function downloadPdf() {
   }
 
   const summaryDataUrl = createArabicSummaryImage(arabicLines)
+  const info = createArabicInfoImage(arabicInfo)
 
   const pdfBytes = await generateSdqPdf({
     responses: plainResponses,
     scores,
     bands,
-    summaryPngDataUrl: summaryDataUrl
+    summaryPngDataUrl: summaryDataUrl,
+    info
   })
 
   // @ts-ignore
@@ -470,7 +531,7 @@ function onSubmit() {
   width: 100%;
   margin-top: 1rem;
   border-radius: 999px;
-  padding: 0.6rem 1.5rem;
+  padding: 0.8rem 1.5rem;
   font-size: 0.95rem;
   font-weight: 600;
   color: white;
@@ -480,6 +541,10 @@ function onSubmit() {
 
 .linear-g {
   background: linear-gradient(to left, #16a34a, #22c55e);
+}
+
+.linear-r {
+  background: linear-gradient(to left, #fac130, #ffa928);
 }
 
 .primary-btn:hover {

@@ -24,11 +24,13 @@ export interface GenerateSdqPdfInput {
   scores: SdqScores
   bands: SdqBands
   summaryPngDataUrl: string
+  info: string
 }
 
 export async function generateSdqPdf({
   responses,
-  summaryPngDataUrl
+  summaryPngDataUrl,
+  info
 }: GenerateSdqPdfInput) {
   // Load template PDF
   const existingPdfBytes = await fetch('/forms/sdq_ar_self.pdf').then((r) =>
@@ -98,12 +100,25 @@ export async function generateSdqPdf({
   const pngDims = pngImage.scale(0.7) // adjust scale
 
   const x = -150
-  const y = -20 // adjust down/up until it sits where you want
+  const y = -13 // adjust down/up until it sits where you want
   page.drawImage(pngImage, {
     x,
     y,
     width: pngDims.width,
     height: pngDims.height
+  })
+
+  const pngBytesInfo = await (await fetch(info)).arrayBuffer()
+  const pngImageInfo = await pdfDoc.embedPng(pngBytesInfo)
+  const pngDimsInfo = pngImageInfo.scale(0.7) // adjust scale
+
+  const xInfo = -50
+  const yInfo = 640 // adjust down/up until it sits where you want
+  page.drawImage(pngImageInfo, {
+    x: xInfo,
+    y: yInfo,
+    width: pngDimsInfo.width,
+    height: pngDimsInfo.height
   })
 
   // Save new PDF
