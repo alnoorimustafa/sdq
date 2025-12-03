@@ -183,7 +183,7 @@ async function downloadPdf() {
   const plainResponses: Record<number, 0 | 1 | 2> = {}
   for (const [id, val] of Object.entries(responses)) {
     //
-    plainResponses[Number(id)] = val as 0 | 1 | 2
+    plainResponses[Number(id)] = Number(val) as 0 | 1 | 2
   }
 
   const scores = {
@@ -390,8 +390,12 @@ const reverseScoredItems = new Set([7, 11, 14, 21, 25])
 
 // Helper: get item score with reverse scoring applied
 function getItemScore(id: number): number {
-  const raw = responses[id]
-  if (raw === null || raw === undefined) return NaN
+  const val = responses[id]
+  if (val === null || val === undefined) return NaN
+
+  // Ensure we're working with numbers
+  const raw = Number(val)
+
   if (!reverseScoredItems.has(id)) return raw
   if (raw === 0) return 2
   if (raw === 2) return 0
