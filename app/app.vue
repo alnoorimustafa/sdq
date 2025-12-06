@@ -6,4 +6,8 @@
   </div>
 </template>
 
-<style></style>
+<style>
+html {
+  font-family: 'Noto Kufi Arabic', sans-serif;
+}
+</style>

@@ -1,9 +1,21 @@
+<script setup></script>
+
 <template>
-  <div class="bg-gray-50 dark:bg-gray-800 py-[50px]">
-    <SdqSelfFormRTL />
-  </div>
+  <UContainer>
+    <UPage dir="rtl">
+      <UPageHeader title="حكايتي" description="حقيبة المرشد" />
+
+      <UPageBody>
+        <p class="text-2xl text-emerald-500">المقاييس</p>
+        <Measures />
+        <USeparator />
+      </UPageBody>
+
+      <template #right>
+        <p class=""></p>
+      </template>
+    </UPage>
+  </UContainer>
 </template>
 
-<script setup lang="ts">
-// empty for now
-</script>
+<style></style>

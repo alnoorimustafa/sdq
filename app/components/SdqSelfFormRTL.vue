@@ -1,20 +1,13 @@
 <template>
-  <UContainer class="sdq-app">
+  <UContainer class="sdq-app my-10">
     <div class="text-center">
-      <div
-        class="text-[24px] font-bold linear-g rounded-lg text-white mb-4 p-2"
-      >
-        <p>SDQ</p>
-
-        <p>استبيان نقاط القوة والصعوبات (نسخة ذاتية)</p>
-      </div>
-
       <p class="dark:text-neutral-400 text-sm">
-        من فضلك أجب عن كيفية كون الأمور معك خلال الأشهر الستة الماضية.
+        من فضلك أجب عن كيفية كون الأمور معك خلال
+        <span class="font-bold text-red-400"> الأشهر الستة الماضية. </span>
       </p>
     </div>
 
-    <div dir="ltr" class="text-left">
+    <div dir="ltr" class="text-left my-4">
       <UColorModeSwitch />
     </div>
     <!-- Form -->
