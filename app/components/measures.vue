@@ -30,6 +30,7 @@ const posts = ref([
       :title="post.title"
       :date="post.date"
       :description="post.description"
+      :to="post.to"
     />
   </UBlogPosts>
 </template>
