@@ -104,6 +104,10 @@
         </p>
       </div>
 
+      <UButton @click="downloadPdf" class="primary-btn linear-g mt-4">
+        تنزيل النسخة الأصلية مع التقرير
+      </UButton>
+
       <p class="mt-8 text-neutral-500 text-xs text-justify">
         أعلى درجة ممكنة هي 70 وأقل درجة هي 14. النتيجة الأعلى تعني مستوى أعلى من
         الصحة النفسية والرفاهية.
@@ -114,6 +118,7 @@
 
 <script setup lang="ts">
 import { reactive, computed, ref } from 'vue'
+import { generateWemwbsPdf } from '~/utils/generateWemwbsPdf'
 
 const userName = ref('')
 const birthYear = ref('')
@@ -187,38 +192,7 @@ function getBandClass(score: number): string {
   if (label === 'أقل من المتوسط') return 'band-mild' // (yellow)
   if (label === 'متوسط') return 'band-ok' // (green)
   return 'band-ok' // High wellbeing is also good (green)
-} // Note: SDQ uses 'band-high' for orange, but WEMWBS might not need it if we map straightforwardly.
-// Let's stick to the requested coloring:
-// SDQ logic:
-// band-ok (green)
-// band-mild (yellow)
-// band-high (orange)
-// band-very-high (red)
-
-// Re-evaluating WEMWBS mapping based on SDQ typical "severity" vs "wellbeing":
-// WEMWBS is positive: Higher is better.
-// SDQ is negative: Higher is worse.
-
-// user said "same coloring of results according to score like @SdqSelfFormRTL.vue"
-// In SDQ:
-// Red = Very High Difficulties (Bad)
-// Orange = High Difficulties (Bad)
-// Yellow = Slightly Raised (Warning)
-// Green = Close to Average (Good)
-
-// So for WEMWBS (Higher is better):
-// Red = Low score (Bad)
-// Yellow = Below average (Warning)
-// Green = Average or Above (Good)
-
-// My implementation of getBandClass above:
-// < 33 (Very Low) -> band-very-high (Red) -> Correct
-// 33-40 (Below Average) -> band-mild (Yellow) -> Correct
-// 41-59 (Average) -> band-ok (Green) -> Correct
-// >= 60 (Above Average) -> band-ok (Green) -> Correct
-
-// I should probably ensure the orange class is available if needed, but for now I'll just map to these 3 states as per the standard interpretation
-// or maybe 'Average' should be Green and 'Above Average' also Green? Yes.
+}
 
 function allAnswered(): boolean {
   return questions.every(
@@ -234,6 +208,92 @@ function handleSubmit() {
   }
   validationError.value = ''
   showResults.value = true
+}
+
+// --- PDF Generation ---
+async function downloadPdf() {
+  // 1. Prepare data
+  const plainResponses: Record<number, number> = {}
+  for (const [id, val] of Object.entries(responses)) {
+    if (val !== undefined) {
+      plainResponses[Number(id)] = val
+    }
+  }
+
+  const scoreText =
+    `مجموع النتائج: ${totalScore.value} / 70 (` +
+    getScoreInterpretation(totalScore.value) +
+    ')'
+
+  const arabicInfo = [
+    `الاسم: ${userName.value}`,
+    `المواليد: ${birthYear.value}`,
+    `الجنس: ${sex.value}`
+  ]
+
+  // 2. Helpers for Text->Image (to handle Arabic in PDF)
+  function createArabicSummaryImage(text: string): string {
+    const canvas = document.createElement('canvas')
+    canvas.width = 800
+    canvas.height = 150
+
+    const ctx = canvas.getContext('2d')!
+    // Background clear
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    ctx.fillStyle = '#006570' // Teal color
+    ctx.font = 'bold 24px "Noto Kufi Arabic", Arial'
+    ctx.textAlign = 'right'
+    ctx.direction = 'rtl'
+
+    // Draw text
+    ctx.fillText(text, canvas.width - 20, 80)
+
+    return canvas.toDataURL('image/png')
+  }
+
+  function createArabicInfoImage(lines: string[]): string {
+    const canvas = document.createElement('canvas')
+    canvas.width = 800
+    canvas.height = lines.length * 40 + 40
+
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#006570'
+    ctx.font = '20px "Noto Kufi Arabic", Arial'
+    ctx.textAlign = 'right'
+    ctx.direction = 'rtl'
+
+    let y = 40
+    for (const line of lines) {
+      ctx.fillText(line, canvas.width - 20, y)
+      y += 40
+    }
+
+    return canvas.toDataURL('image/png')
+  }
+
+  // 3. Generate Images
+  const summaryImg = createArabicSummaryImage(scoreText)
+  const infoImg = createArabicInfoImage(arabicInfo)
+
+  // 4. Call Generator
+  const pdfBytes = await generateWemwbsPdf({
+    responses: plainResponses,
+    totalScore: totalScore.value,
+    interpretation: getScoreInterpretation(totalScore.value),
+    summaryPngDataUrl: summaryImg,
+    infoPngDataUrl: infoImg
+  })
+
+  // 5. Trigger Browser Download
+  // @ts-ignore
+  const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'WEMWBS_Result.pdf'
+  a.click()
+  URL.revokeObjectURL(url)
 }
 </script>
 
