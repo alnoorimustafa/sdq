@@ -73,8 +73,15 @@
       </UCard>
 
       <div class="actions">
-        <button v-if="!showResults" type="submit" class="primary-btn linear-g">
-          عرض نتائجي
+        <button
+          v-if="!showResults"
+          type="submit"
+          class="primary-btn relative linear-g"
+          :class="[isSubmitting ? 'opacity-75 cursor-not-allowed' : '']"
+          :disabled="isSubmitting"
+        >
+          <span v-if="!isSubmitting">عرض نتائجي</span>
+          <span v-else>جاري الإرسال...</span>
         </button>
 
         <button
@@ -91,7 +98,6 @@
         </p>
       </div>
     </form>
-
     <!-- النتائج -->
     <section v-if="showResults" class="results">
       <h2>النتيجة</h2>
@@ -167,6 +173,7 @@ const responses = reactive<Record<number, number | undefined>>(
 
 const showResults = ref(false)
 const validationError = ref('')
+const isSubmitting = ref(false)
 
 const totalScore = computed(() => {
   let sum = 0
@@ -200,14 +207,100 @@ function allAnswered(): boolean {
   )
 }
 
-function handleSubmit() {
+async function handleSubmit() {
   if (!allAnswered()) {
     validationError.value = 'من فضلك أجب عن جميع الأسئلة قبل عرض النتائج.'
     showResults.value = false
     return
   }
   validationError.value = ''
-  showResults.value = true
+  isSubmitting.value = true
+  try {
+    await submitWemwbsToGoogleSheet()
+  } catch (error) {
+    console.error('Failed to submit results:', error)
+  } finally {
+    isSubmitting.value = false
+    showResults.value = true
+  }
+}
+
+const ENTRY = {
+  name: '917912779',
+  birthYear: '1749321498',
+  sex: '1791830944',
+  result: '296006736',
+  q: {
+    1: '1274507697',
+    2: '2061421955',
+    3: '976295484',
+    4: '1219534058',
+    5: '1706240862',
+    6: '726965678',
+    7: '1735498679',
+    8: '444808339',
+    9: '1815054676',
+    10: '740396439',
+    11: '127261419',
+    12: '1763279270',
+    13: '615938107',
+    14: '2023487353'
+  }
+} as const
+
+async function submitWemwbsToGoogleSheet() {
+  const formResponseUrl =
+    'https://docs.google.com/forms/d/e/1FAIpQLSfD07Z3yv_Rj-OFXAL0fr708MeO7jLVXLZzGFu-XCnuRCgGOQ/formResponse'
+
+  const params = new URLSearchParams()
+
+  // Basic fields
+  params.append(`entry.${ENTRY.name}`, userName.value || '')
+  params.append(`entry.${ENTRY.birthYear}`, String(birthYear.value || ''))
+
+  // Map Arabic to exactly what Google Forms expects for the sex options
+  const mappedSex =
+    sex.value === 'ذكر' ? 'male' : sex.value === 'أنثى' ? 'female' : ''
+  params.append(`entry.${ENTRY.sex}`, mappedSex)
+
+  // Append Result
+  params.append(`entry.${ENTRY.result}`, String(totalScore.value))
+
+  // Questions:
+  // IMPORTANT: your form options are Arabic labels like "أبداً"
+  // so you must submit the LABEL, not 1..5
+  for (let i = 1; i <= 14; i++) {
+    const numeric = responses[i] // 1..5
+    if (numeric !== undefined) {
+      const label = numericToArabicOption(numeric)
+      params.append(`entry.${ENTRY.q[i as keyof typeof ENTRY.q]}`, label)
+    }
+  }
+
+  await fetch(formResponseUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString()
+  })
+}
+
+// map your numeric scale -> the exact Arabic choices used in Google Form
+function numericToArabicOption(v?: number) {
+  switch (v) {
+    case 1:
+      return 'أبداً'
+    case 2:
+      return 'نادراً'
+    case 3:
+      return 'بعض الأوقات'
+    case 4:
+      return 'غالباً'
+    case 5:
+      return 'دائماً'
+    default:
+      return ''
+  }
 }
 
 // --- PDF Generation ---
@@ -299,8 +392,15 @@ async function downloadPdf() {
 
 <style scoped>
 .wemwbs-app {
-  font-family: 'Noto Kufi Arabic', 'Scheherazade New', 'Amiri',
-    'Noto Sans Arabic', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+  font-family:
+    'Noto Kufi Arabic',
+    'Scheherazade New',
+    'Amiri',
+    'Noto Sans Arabic',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
     sans-serif;
   direction: rtl;
   text-align: right;

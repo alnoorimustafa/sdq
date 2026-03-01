@@ -73,11 +73,18 @@
       <div class="actions">
         <button
           type="submit"
-          class="primary-btn"
-          :class="showResults ? 'linear-r' : 'linear-g'"
+          class="primary-btn relative"
+          :class="[
+            showResults ? 'linear-r' : 'linear-g',
+            isSubmitting ? 'opacity-75 cursor-not-allowed' : ''
+          ]"
           @click.prevent="showResults ? resetForm() : onSubmit()"
+          :disabled="isSubmitting"
         >
-          {{ showResults ? 'إعادة الحساب' : 'عرض نتائجي' }}
+          <span v-if="!isSubmitting">{{
+            showResults ? 'إعادة الحساب' : 'عرض نتائجي'
+          }}</span>
+          <span v-else>جاري الإرسال...</span>
         </button>
         <p v-if="validationError" class="error">
           {{ validationError }}
@@ -377,6 +384,7 @@ const responses = reactive<Record<number, AnswerValue | undefined>>(
 
 const showResults = ref(false)
 const validationError = ref('')
+const isSubmitting = ref(false)
 
 // Reverse-scored items (0→2, 1→1, 2→0)
 const reverseScoredItems = new Set([7, 11, 14, 21, 25])
@@ -481,22 +489,136 @@ function allAnswered(): boolean {
   )
 }
 
+const ENTRY = {
+  name: '1651806469',
+  birthYear: '1307507889',
+  sex: '112775474',
+  result: '267599534',
+  date: '1570042364',
+  emotionalScore: '116679633',
+  conductScore: '864003144',
+  hyperScore: '664126756',
+  peerScore: '1868831960',
+  prosocialScore: '1131941678',
+  q: {
+    1: '1622200268',
+    2: '118304978',
+    3: '53251323',
+    4: '430619880',
+    5: '2123421530',
+    6: '745882865',
+    7: '271821372',
+    8: '1614504719',
+    9: '552088749',
+    10: '343856077',
+    11: '1944406772',
+    12: '223975122',
+    13: '840039371',
+    14: '253844390',
+    15: '790016920',
+    16: '686676229',
+    17: '1317888353',
+    18: '88375566',
+    19: '1234618663',
+    20: '320596137',
+    21: '1650727488',
+    22: '2025517881',
+    23: '378950490',
+    24: '685777208',
+    25: '1889291517'
+  }
+} as const
+
+async function submitSdqToGoogleSheet() {
+  const formResponseUrl =
+    'https://docs.google.com/forms/d/e/1FAIpQLSfkT-vVyl1atvVRbnWq-fFlq2oJ837nt2OTOeuaNryvmhi9PA/formResponse'
+
+  const params = new URLSearchParams()
+
+  // Basic fields
+  params.append(`entry.${ENTRY.name}`, childName.value || '')
+  params.append(`entry.${ENTRY.birthYear}`, String(birthYear.value || ''))
+
+  const mappedSex =
+    sex.value === 'أنثى' ? 'انثى' : sex.value === 'ذكر' ? 'ذكر' : ''
+  params.append(`entry.${ENTRY.sex}`, mappedSex)
+
+  // Append Result
+  params.append(`entry.${ENTRY.result}`, String(totalDifficulties.value))
+
+  // Date
+  const today = new Date()
+  const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  params.append(`entry.${ENTRY.date}`, dateStr)
+
+  // Subscale scores
+  params.append(`entry.${ENTRY.emotionalScore}`, String(emotionalScore.value))
+  params.append(`entry.${ENTRY.conductScore}`, String(conductScore.value))
+  params.append(`entry.${ENTRY.hyperScore}`, String(hyperScore.value))
+  params.append(`entry.${ENTRY.peerScore}`, String(peerScore.value))
+  params.append(`entry.${ENTRY.prosocialScore}`, String(prosocialScore.value))
+
+  for (let i = 1; i <= 25; i++) {
+    const numeric = responses[i]
+    if (numeric !== undefined) {
+      const label = numericToArabicOption(numeric)
+      params.append(`entry.${ENTRY.q[i as keyof typeof ENTRY.q]}`, label)
+    }
+  }
+
+  await fetch(formResponseUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: params.toString()
+  })
+}
+
+function numericToArabicOption(v?: AnswerValue) {
+  switch (v) {
+    case 0:
+      return 'غير صحيح'
+    case 1:
+      return 'صحيح إلى حد ما'
+    case 2:
+      return 'صحيح تماماً'
+    default:
+      return ''
+  }
+}
+
 // Submit handler
-function onSubmit() {
+async function onSubmit() {
   if (!allAnswered()) {
     validationError.value = 'من فضلك أجب عن جميع الأسئلة قبل عرض النتائج.'
     showResults.value = false
     return
   }
   validationError.value = ''
-  showResults.value = true
+
+  isSubmitting.value = true
+  try {
+    await submitSdqToGoogleSheet()
+  } catch (error) {
+    console.error('Failed to submit results:', error)
+  } finally {
+    isSubmitting.value = false
+    showResults.value = true
+  }
 }
 </script>
 
 <style scoped>
 .sdq-app {
-  font-family: 'Noto Kufi Arabic', 'Scheherazade New', 'Amiri',
-    'Noto Sans Arabic', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+  font-family:
+    'Noto Kufi Arabic',
+    'Scheherazade New',
+    'Amiri',
+    'Noto Sans Arabic',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
     sans-serif;
   direction: rtl;
   text-align: right;

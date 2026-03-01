@@ -28,8 +28,16 @@
       </div>
 
       <div class="actions">
-        <button type="submit" class="primary-btn">
-          {{ showResults ? 'Recalculate' : 'See my results' }}
+        <button
+          type="submit"
+          class="primary-btn relative"
+          :class="[isSubmitting ? 'opacity-75 cursor-not-allowed' : '']"
+          :disabled="isSubmitting"
+        >
+          <span v-if="!isSubmitting">{{
+            showResults ? 'Recalculate' : 'See my results'
+          }}</span>
+          <span v-else>Submitting...</span>
         </button>
         <p v-if="validationError" class="error">
           {{ validationError }}
@@ -184,6 +192,8 @@ const responses = reactive<Record<number, AnswerValue | null>>(
 
 const showResults = ref(false)
 const validationError = ref('')
+const isSubmitting = ref(false)
+const config = useRuntimeConfig()
 
 // Reverse-scored items (0→2, 1→1, 2→0)
 const reverseScoredItems = new Set([7, 11, 14, 21, 25])
@@ -286,7 +296,7 @@ function allAnswered(): boolean {
 }
 
 // Submit handler
-function onSubmit() {
+async function onSubmit() {
   if (!allAnswered()) {
     validationError.value =
       'Please answer all questions before seeing your results.'
@@ -294,7 +304,35 @@ function onSubmit() {
     return
   }
   validationError.value = ''
-  showResults.value = true
+
+  isSubmitting.value = true
+  try {
+    if (config.public.googleSheetUrl) {
+      await fetch(config.public.googleSheetUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8'
+        },
+        body: JSON.stringify({
+          type: 'SDQ',
+          totalDifficulties: totalDifficulties.value,
+          emotionalScore: emotionalScore.value,
+          conductScore: conductScore.value,
+          hyperScore: hyperScore.value,
+          peerScore: peerScore.value,
+          prosocialScore: prosocialScore.value,
+          responses: responses
+        })
+      })
+    } else {
+      console.warn('Google Sheet URL is not configured. Skipping submission.')
+    }
+  } catch (error) {
+    console.error('Failed to submit results:', error)
+  } finally {
+    isSubmitting.value = false
+    showResults.value = true
+  }
 }
 </script>
 
@@ -303,7 +341,11 @@ function onSubmit() {
   max-width: 900px;
   margin: 0 auto;
   padding: 1.5rem;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
     sans-serif;
   color: #111827;
 }
