@@ -17,6 +17,12 @@ const posts = ref([
     description: 'مقياس انا ومشاعري',
     date: '16',
     to: '/memy'
+  },
+  {
+    title: 'ECR-R',
+    description: 'مقياس الخبرات في العلاقات الحميمة (أنماط التعلّق)',
+    date: '36',
+    to: '/ecrr'
   }
 ])
 </script>
