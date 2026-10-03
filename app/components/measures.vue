@@ -23,6 +23,18 @@ const posts = ref([
     description: 'مقياس الخبرات في العلاقات الحميمة (أنماط التعلّق)',
     date: '36',
     to: '/ecrr'
+  },
+  {
+    title: 'PedsQL 4.0 - الطفل',
+    description: 'مقياس جودة حياة الطفل - تقرير الطفل',
+    date: '23',
+    to: '/pedsql-child'
+  },
+  {
+    title: 'PedsQL 4.0 - الأم',
+    description: 'مقياس جودة حياة الطفل - تقرير الأم / الوالدين',
+    date: '23',
+    to: '/pedsql-parent'
   }
 ])
 </script>
